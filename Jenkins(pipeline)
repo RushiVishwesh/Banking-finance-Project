@@ -1,0 +1,41 @@
+pipeline {
+    agent { label 'Build_slave' }	
+
+    stages {
+        stage('SCM Checkout') {
+            steps {
+                git 'https://github.com/RushiVishwesh/Banking-finance-project.git'
+            }
+		}
+        stage('Maven build') {
+            steps {
+                sh "mvn clean package"
+            }
+		}
+        stage("Docker build"){
+            steps {
+				sh "docker build -t vishweshrushi/banking_project:${BUILD_NUMBER} ."
+				sh "docker tag vishweshrushi/banking_project:${BUILD_NUMBER} vishweshrushi/banking_project:latest"
+            }
+        }
+		stage('Login dockerhub') {
+
+			steps {
+				sh 'docker login --username vishweshrushi --password dckr_pat_cOv2cbsFFxpW1X1KHX_mDLYTsjE'
+			}
+		}
+		stage('Push to dockerhub') {
+
+			steps {
+				sh "docker push vishweshrushi/banking_project:latest"
+			}
+		}
+        stage('Deploy to kubernetes_cluster') {
+            steps {
+		        script {
+		        sshPublisher(publishers: [sshPublisherDesc(configName: 'Kubernetes  cluster', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: 'kubectl apply -f kubernetes_manifest.yml', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '.', remoteDirectorySDF: false, removePrefix: '', sourceFiles: 'kubernetes_manifest.yml')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+		       }
+            }
+    	}
+    }
+}
